@@ -5,7 +5,7 @@
 # branch it ran on, so app.py and check.py find them.
 #
 # GitHub's free runners have no GPU, so this trains on CPU. Expect roughly an
-# hour or two for yolo11n on this dataset; GitHub allows up to 6 hours a job.
+# hour or two for yolo11n at 30 epochs; GitHub allows up to 6 hours a job.
 name: Train model
 
 on:
@@ -13,7 +13,7 @@ on:
     inputs:
       epochs:
         description: "Training epochs"
-        default: "50"
+        default: "30"
         required: true
 
 permissions:
