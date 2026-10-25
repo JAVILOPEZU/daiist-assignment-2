@@ -1,0 +1,9 @@
+{
+  "_note": "PLACEHOLDERS. Replace every figure with your own and justify each one in REPORT.md. Euros per mushroom; base_rate is the share of mushrooms people actually bring that are poisonous. The app reads this file live; re-run train.py to refresh the saved sweep and operating point.",
+  "fn": 1000.0,
+  "fp": 5.0,
+  "tp": 0.0,
+  "tn": 0.0,
+  "review": 2.0,
+  "base_rate": 0.2
+}

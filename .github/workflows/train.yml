@@ -1,0 +1,64 @@
+# Manual only, like verify.yml.
+#
+# Runs the real training pipeline (`uv run python main.py train`) on a GitHub
+# runner, then commits the weights and artifacts it produced back to the
+# branch it ran on, so app.py and check.py find them.
+#
+# GitHub's free runners have no GPU, so this trains on CPU. Expect roughly an
+# hour or two for yolo11n on this dataset; GitHub allows up to 6 hours a job.
+name: Train model
+
+on:
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: "Training epochs"
+        default: "50"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      ROBOFLOW_API_KEY: ${{ secrets.ROBOFLOW_API_KEY }}
+      EPOCHS: ${{ inputs.epochs }}
+      YOLO_AUTOINSTALL: "false"
+      YOLO_CONFIG_DIR: ${{ github.workspace }}/.yolo
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Train, evaluate and cost
+        run: uv run python main.py train
+
+      - name: Keep the full Ultralytics run for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runs
+          path: runs/
+          if-no-files-found: ignore
+
+      - name: Commit weights and artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add weights/ artifacts/
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            git commit -m "Train model (${EPOCHS} epochs, run ${GITHUB_RUN_ID})"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
