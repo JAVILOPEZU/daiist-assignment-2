@@ -51,6 +51,14 @@ jobs:
           path: runs/
           if-no-files-found: ignore
 
+      - name: Keep the weights and artifacts as a download too
+        uses: actions/upload-artifact@v4
+        with:
+          name: weights-and-artifacts
+          path: |
+            weights/
+            artifacts/
+
       - name: Commit weights and artifacts
         run: |
           git config user.name "github-actions[bot]"
@@ -60,5 +68,7 @@ jobs:
             echo "Nothing new to commit."
           else
             git commit -m "Train model (${EPOCHS} epochs, run ${GITHUB_RUN_ID})"
+            # The branch may have moved while training ran: put this commit on top.
+            git pull --rebase origin "${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
