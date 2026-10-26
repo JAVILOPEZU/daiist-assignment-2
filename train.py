@@ -64,7 +64,7 @@ ARTIFACTS = ROOT / "artifacts"
 SPLITS = {"train": "train", "val": "valid", "test": "test"}  # name -> folder
 MATCH_IOU = 0.5        # a predicted box "covers" a mushroom at IoU >= 0.5
 SWEEP_CONF = 0.001     # keep nearly every box so the sweep sees the whole range
-ZERO_SHOT_CONF = 0.25  # Ultralytics' default confidence, for the COCO baseline
+DEFAULT_CONF = 0.25    # Ultralytics' usual confidence: COCO baseline and confusion matrix
 THRESHOLDS = np.round(np.linspace(0, 1, 101), 2)  # single-threshold sweep
 BAND_GRID = np.round(np.linspace(0, 1, 51), 2)    # coarser grid for the two-threshold search
 
@@ -168,9 +168,17 @@ def finetune(data_yaml: Path) -> Path:
 
 
 def evaluate_on_test(weights: Path, data_yaml: Path, names: list[str]) -> dict:
-    """Ultralytics' test-split metrics: overall, per class, and confusion matrix."""
-    result = YOLO(str(weights)).val(data=str(data_yaml), split="test", imgsz=IMGSZ,
-                                    project=str(RUNS_DIR), name="test", exist_ok=True)
+    """Ultralytics' test-split metrics: overall, per class, and confusion matrix.
+
+    AP needs every box down to a very low confidence, but a confusion matrix
+    built from those would count thousands of junk boxes as false positives.
+    So the matrix comes from a second pass at Ultralytics' usual 0.25.
+    """
+    model = YOLO(str(weights))
+    result = model.val(data=str(data_yaml), split="test", imgsz=IMGSZ,
+                       project=str(RUNS_DIR), name="test", exist_ok=True)
+    at_025 = model.val(data=str(data_yaml), split="test", imgsz=IMGSZ, conf=DEFAULT_CONF,
+                       project=str(RUNS_DIR), name="test_conf025", exist_ok=True)
     box = result.box
     per_class = {
         names[int(cls)]: {
@@ -179,16 +187,20 @@ def evaluate_on_test(weights: Path, data_yaml: Path, names: list[str]) -> dict:
         }
         for i, cls in enumerate(box.ap_class_index)
     }
-    for plot in ("confusion_matrix.png", "confusion_matrix_normalized.png", "BoxPR_curve.png"):
-        source = Path(result.save_dir) / plot
+    plots = {"BoxPR_curve.png": result, "confusion_matrix.png": at_025,
+             "confusion_matrix_normalized.png": at_025}
+    for plot, source_run in plots.items():
+        source = Path(source_run.save_dir) / plot
         if source.exists():
             shutil.copy2(source, ARTIFACTS / plot)
     return {
         "map50": float(box.map50),
         "map50_95": float(box.map),
         "per_class": per_class,
-        # Rows = predicted class, columns = true class; last one is background.
-        "confusion_matrix": result.confusion_matrix.matrix.astype(int).tolist(),
+        # At confidence 0.25. Rows = predicted class, columns = true class;
+        # the last row/column is background (missed mushroom / box on nothing).
+        "confusion_matrix_conf": DEFAULT_CONF,
+        "confusion_matrix": at_025.confusion_matrix.matrix.astype(int).tolist(),
         "confusion_labels": names + ["background"],
     }
 
@@ -218,7 +230,7 @@ def coco_zero_shot(split: str) -> dict:
     model = YOLO(BASE_MODEL)
     found, total, seen_as = 0, 0, Counter()
     for image in split_images(split):
-        result = model.predict(str(image), conf=ZERO_SHOT_CONF, imgsz=IMGSZ, verbose=False)[0]
+        result = model.predict(str(image), conf=DEFAULT_CONF, imgsz=IMGSZ, verbose=False)[0]
         pred_boxes = result.boxes.xyxyn.cpu().numpy()
         pred_cls = result.boxes.cls.cpu().numpy().astype(int)
         for _, box in read_labels(image):
@@ -290,8 +302,12 @@ def main() -> None:
     stats = describe_dataset(names)
     print(json.dumps(stats, indent=2))
 
-    # 3-4. Finetune and evaluate
-    weights = finetune(data_yaml)
+    # 3-4. Finetune and evaluate. REUSE_WEIGHTS=1 skips the finetune and reuses
+    # the committed weights, e.g. to redo the costing after editing costs.json.
+    if os.environ.get("REUSE_WEIGHTS") == "1" and BEST_WEIGHTS.exists():
+        weights = BEST_WEIGHTS
+    else:
+        weights = finetune(data_yaml)
     finetuned = evaluate_on_test(weights, data_yaml, names)
     baselines = {"coco_zero_shot": coco_zero_shot("test"),
                  "predict_nothing": {"map50": 0.0, "map50_95": 0.0}}

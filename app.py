@@ -245,7 +245,7 @@ with gr.Blocks(title="Mushroom safety check") as demo:
                      interactive=False)
         if (ARTIFACTS / "confusion_matrix.png").exists():
             gr.Image(str(ARTIFACTS / "confusion_matrix.png"),
-                     label="Ultralytics confusion matrix (test split)")
+                     label="Ultralytics confusion matrix (test split, confidence 0.25)")
 
     cost_outputs = [confusion, summary, policies, curve]
     for slider in (lower, upper):

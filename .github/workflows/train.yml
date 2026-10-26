@@ -15,6 +15,10 @@ on:
         description: "Training epochs"
         default: "30"
         required: true
+      reuse_weights:
+        description: "Skip the finetune and reuse weights/best.pt (only redo evaluation and costing)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,6 +30,7 @@ jobs:
     env:
       ROBOFLOW_API_KEY: ${{ secrets.ROBOFLOW_API_KEY }}
       EPOCHS: ${{ inputs.epochs }}
+      REUSE_WEIGHTS: ${{ inputs.reuse_weights && '1' || '0' }}
       YOLO_AUTOINSTALL: "false"
       YOLO_CONFIG_DIR: ${{ github.workspace }}/.yolo
     steps:
@@ -67,7 +72,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nothing new to commit."
           else
-            git commit -m "Train model (${EPOCHS} epochs, run ${GITHUB_RUN_ID})"
+            git commit -m "Train model (${EPOCHS} epochs, reuse_weights=${REUSE_WEIGHTS}, run ${GITHUB_RUN_ID})"
             # The branch may have moved while training ran: put this commit on top.
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
