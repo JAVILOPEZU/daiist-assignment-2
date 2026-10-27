@@ -9,26 +9,34 @@ CÓMO USAR ESTA PLANTILLA
 - Borra estos comentarios cuando termines (no se ven en GitHub, pero mejor limpio).
 -->
 
-- **Name**:
-- **Student ID**:
-- **Email**:
+- **Name**: Javier López-Usero Fernández
+- **Student ID**: 18633
+- **Email**: jlopezusero.ieu2022@student.ie.edu
 - **Group**: [BBADBA 5A | BBADBA 5B | PPLEDBA 5A | BDBA 3A]
 
 ## Business problem, and the cost of being wrong
 
-**Decision supported:** [TU ANÁLISIS: ¿quién usa el modelo (un recolector, una asociación micológica, una app), en qué momento, y qué hace con la respuesta?]
+**Decision supported:**
+Who hasn't gone on a trail on the mountains and has found the best-looking round chowy mushroom that looks just like the ones little kids draw in pictures and also as tasty as beautiful. Who hasn't wondered if
+it's alright to take it home, cook it and have it for lunch or better, get your little camping gas and cook it until roasty and eat it in the night. It is widely known that the mushroom kingdom is a very tricky
+and complicated one, since many mushrooms deceive with their tasty looks and then, even a single touch is enough to send you to the hospital. What I propose is a quick, safe and easy way of solving this doubts now and forever, since anyone with a phone and a camera could download the app with the model embedded, and take a picture of the mushroom thay want to obtain an instant response. In case there is some doubt, an expert would be added in the loop to double check for non-poison. 
 
 **Positive class:** Poisonous-mushroom.
 
 | Outcome | What happens in practice | Cost (€ per mushroom) |
 |---|---|---|
-| True positive (poisonous, thrown away) | [qué pasa] | 0 <!-- costs.json: tp --> |
-| False negative (poisonous, eaten) | [qué pasa] | 1,000 <!-- costs.json: fn --> |
-| False positive (edible, thrown away) | [qué pasa] | 10 <!-- costs.json: fp --> |
-| True negative (edible, eaten) | [qué pasa] | 0 <!-- costs.json: tn --> |
-| Sent to a person for review | [quién revisa y cuánto cuesta su tiempo] | 3 <!-- costs.json: review --> |
+| True positive (poisonous, thrown away) | someone has been prevented from taking a poisonous mushroom | 0 <!-- costs.json: tp --> |
+| False negative (poisonous, eaten) | sue against the company and possibility of death | 1,000 <!-- costs.json: fn --> |
+| False positive (edible, thrown away) | small cost | 10 <!-- costs.json: fp --> |
+| True negative (edible, eaten) | satisfied customer | 0 <!-- costs.json: tn --> |
+| Sent to a person for review | there is an expert in the loop who reviews and re-enters the new tagged mushrooms in the training model so that the model is fine tuned | 3 <!-- costs.json: review --> |
 
-**Why the two errors cost different amounts:** [TU ANÁLISIS: ¿cuántas veces peor es un FN que un FP y por qué? ¿De dónde sale cada cifra?]
+**Why the two errors cost different amounts:**
+A false positive is undesired, sure, but with this specific business problem the threshold must be of almost certainty (altough that is never achievable) in order to allow a person to eat a mushroom, since there
+is no big cost in throwing away an edible one but a huge cost implied in eating a poisonous one. I've stated the cost of throwing away an edible mushroom at 1€ since that is an estimate average of edible
+mushrooms' price in supermarkets, so the cost of substitution would be similar to 1€. On the other hand, I've stated the cost of eating a poisonous mushroom at 1000x this, to highlight the difference in outcomes
+between both events. A person that eats a mushroom and suffers from a disease can righteously fill in a lawsuit against us and can also suffer from complicated diseases that should be treated with advanced
+medical equipment, so we, as a company, could need to cover for that aswell.
 
 ## Dataset
 
@@ -36,9 +44,11 @@ CÓMO USAR ESTA PLANTILLA
 - **Link:** https://universe.roboflow.com/jamurdetection/jamur-detection/dataset/2
 - **Task:** object detection, 2 classes: `Edible-mushroom`, `Poisonous-mushroom`
 - **Used as published** (downloaded directly, not forked).
-- **What one image represents:** [TU ANÁLISIS: ¿qué se ve en una imagen típica? ¿una seta, varias, en el bosque, de catálogo?]
+- **What one image represents:**
+One image usually represents a mushroom with the typical forest floor of leaves, sticks, rocks and bugs.
 
-**Why this dataset serves the problem:** [TU ANÁLISIS: ¿se parecen estas fotos a las que haría un recolector con el móvil? ¿en qué no?]
+**Why this dataset serves the problem:**
+This dataset serves perfectly the problem because it was gathered in the same way that users are expected to use it. They are expected to aim for the best quality and closeness of their photos in order for the system work better and correctly detect whether or not they can eat the mushrooms.
 
 ## What the dataset's composition implies
 
