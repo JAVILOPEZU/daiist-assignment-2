@@ -62,13 +62,13 @@ This dataset serves perfectly the problem because it was gathered in the same wa
 - Train images are augmented by Roboflow (2 outputs per source image: flips and crop), so the 694 train images come from about 347 originals. Validation and test are not augmented.
 - Box size: 10 % of boxes cover less than 1.9 % of the image, 10 % cover more than 44.9 %. <!-- m → box_area_share_of_image.p10 / .p90 del split test -->
 
-**What this implies:** [TU ANÁLISIS: ¿hay desequilibrio entre clases? ¿la clase positiva tiene suficientes instancias en test para fiarse de su precisión/recall? ¿qué no se puede concluir con solo 50 imágenes de test? ¿se parece el test a producción?]
-
+**What this implies:**
+There is considerable unbalance between positive and negative clases, about 2 edible per poisonous, but there is also enough classes to allow precission and recall to be taken into consideration. Testing for poisonous is not enough, since 50 images is not enough to determine if the filter is working well, so the dataset should be enhanced with photos taken by customers on a future, in order to make the model more precise.
 ## Finetuning and baselines
 
 **Where and how I trained:** GitHub Actions (`.github/workflows/train.yml`), CPU-only runner, `yolo11n` from the COCO-pretrained checkpoint, 30 epochs, image size 640, seed 0, all other settings Ultralytics defaults. Training took about 1 h 30 min. <!-- m → training; duración en la pestaña Actions -->
 
-**Why detection with yolo11n:** [TU ANÁLISIS: ¿por qué detección y no clasificación (pista: 2 clases)? ¿por qué el modelo pequeño?]
+**Why detection with yolo11n:** I used detection and not classification because there are sometimes many mushrooms in one image, and a classificator would label the entire image in one label. On the other hand, the classificator treats each mushroom independently. Also, the dataset in Roboflow is labeled in boxes and therefore we should use it as a detection project. Plus is mandatory on the instructions.
 
 Results on the same test split:
 
@@ -82,8 +82,10 @@ Results on the same test split:
 
 The COCO model has no mushroom class, so it cannot score on our classes. It put a box on 19.9 % of the test mushrooms (37 of 186), mostly labelled as donut (18), vase (8) and banana (5). <!-- m → baselines.coco_zero_shot.share_of_mushrooms_boxed_as_any_coco_class / coco_labels_it_used -->
 
-**Interpretation:** [TU ANÁLISIS: ¿cuánto mejora el modelo a los baselines? ¿y en euros? Si en euros no los mejora, explícalo: es un hallazgo válido según el enunciado.]
-
+**Interpretation:**
+The fine tuned model overperforms consistently any other of the baselines since the false negative cost is very high and it shadows any other cost very quickly. A random guessing model would be too high because
+50% of the time it would be killing people and the COCO yolo11 zero-shot only detected 20% of the mushrooms and labeled very wrongly the rest, not giving good trustability with answers. The most efficient one
+in terms of € of cost is the trained one, since it is three thousand € against two hundred thousand of the others due to the non-existence of false negatives.
 ## Per-class evaluation and failure modes
 
 | Class | Precision | Recall | AP50 | AP50-95 |
@@ -102,13 +104,14 @@ Confusion matrix on the test split (confidence 0.25):
 | Background (missed) | 9 | 4 | — |
 <!-- m → finetuned.confusion_matrix (filas = predicho, columnas = real). Imagen: artifacts/confusion_matrix.png -->
 
-**Which class carries the headline number:** [TU ANÁLISIS]
+**Which class carries the headline number:**Poisonous carry the headlines since they are the most important to detect, and no false edible are key to the business model. High recall and high precission are key
+in this sense so that we make sure, above all, that no person wrongly eats a poisonous mushroom.
 
-**Where the model fails:** [TU ANÁLISIS: ¿cuántas venenosas se llaman comestibles? ¿cuántas se pierden (background)? Abre artifacts/confidences_test.csv, mira las venenosas con poisonous_conf baja y busca esas imágenes: ¿qué tienen en común?]
-
+**Where the model fails:**
+The model fails if you assign false negative costs too high, since that translates in a higher threshold for mushrooms to be classified as edible, and even if the model is more than 99% sure, they can still be sent in for review, since it accounts for less costs than killing a person
 ## Cost matrix and operating point
 
-**Costs:** see the table in the first section. **Base rate assumed:** 20 % of mushrooms brought for checking are poisonous. <!-- costs.json: base_rate --> [TU ANÁLISIS: ¿de dónde sale esa tasa?]
+**Costs:** see the table in the first section. **Base rate assumed:** 20 % of mushrooms brought for checking are poisonous. <!-- costs.json: base_rate -->
 
 **Unit of decision:** one mushroom. Its score is the model's highest *Poisonous* confidence on a box overlapping it (IoU ≥ 0.5), or 0 if there is none. At threshold *t*, a mushroom fails (thrown away) if its score is ≥ *t* and passes (eaten) otherwise. Costs per 1,000 mushrooms are rates within each true class, reweighted to the assumed base rate.
 
@@ -123,12 +126,14 @@ Confusion matrix on the test split (confidence 0.25):
 | Test FN / FP at that threshold | 1 of 65 poisonous / 0 of 121 edible <!-- op → test_policies.model_alone.fn / .fp --> |
 
 **Assumption that would most change the answer:** [TU ANÁLISIS: formato "Asumí X porque Y, y la respuesta cambia si X baja de Z". Prueba en el dashboard qué cifra hace moverse el umbral.]
-
+Assumed the threshold at 0.01 because I think 99.99% sure that a mushroom isn't poisonous is as sure as you can get, and if you keep adding zeros to virtually be sure 100% that you can eat it, the model just
+sends all the mushrooms to review from the expert and avoids the cost of false negative, which turns the expert into the bottleneck and the project into not a detector but a channel of communication between the
+expert and the user
 ## What a person still has to check
 
 | | Value |
 |---|---|
-| Lower threshold (PASS below) | 0.00 <!-- op → review_band.t_low --> |
+| Lower threshold (PASS below) | 0.01 <!-- op → review_band.t_low --> |
 | Upper threshold (FAIL at or above) | 0.02 <!-- op → review_band.t_high --> |
 | Share sent to review | 80.9 % <!-- op → test_policies.model_plus_review.review_share --> |
 | Mushrooms checked per day (assumed) | 500 <!-- costs.json: cases_per_day --> |
@@ -136,9 +141,9 @@ Confusion matrix on the test split (confidence 0.25):
 | Minutes per review (assumed) | 2 <!-- costs.json: review_minutes --> |
 | Reviewers needed (8 h/day each) | 1.69 <!-- op → .reviewers_needed; costs.json: reviewer_hours_per_day --> |
 
-**Is that realistic?** [TU ANÁLISIS: ¿existe esa gente (micólogos, farmacéuticos)? ¿a qué hora llegan las setas?]
-
-Priced against the alternatives (test split, € per 1,000 mushrooms):
+**Is that realistic?**
+With one reviewer and another one on half-time, you can cover all the mushrooms sent in for review. That is alright since they would only be needed until the model backfeeds enough to absorb the expert's
+knowledge and can subtitute them. If 80.9% of mushrooms are sent for review, that number will only keep decreasing, and more correctly identified mushrooms as edible will pass the security threshold.
 
 | Policy | € per 1,000 | Share reviewed | Reviewers needed |
 |---|---|---|---|
@@ -148,11 +153,16 @@ Priced against the alternatives (test split, € per 1,000 mushrooms):
 | **Model + human review (0.00 – 0.02)** | **2,428** | 80.9 % | 1.69 |
 <!-- op → test_policies.do_nothing / person_checks_all / model_alone / model_plus_review -->
 
-**Recommendation:** [TU ANÁLISIS: ¿qué opción desplegarías y por qué? ¿el modelo es lo bastante bueno para usarse?]
-
+**Recommendation:**
+I would deploy this model with the experts, and give the community of micologists free use so that they can provide their own photos, and therefore with their photos and the expert's knowledge, at 500 photos per
+day we could have a database of 15.000 photos in one month and that is enough information to create a better model. The model as it is is going to make sure you don't posion, but it sends too many cases to the 
+analyst,, but with exponential results and a very steep learning curve, it could turn into a free for use real-time detector in just a few months, solving a problem for many people.
 ## Limitations & next steps
 
-[TU ANÁLISIS: limitaciones reales que hayas encontrado (tamaño del test, fotos poco parecidas a las de un recolector, especies que no aparecen, si las etiquetas son fiables…) y, para cada una, qué harías con más tiempo o datos.]
+The two main limitations that I found were class imbalance and scarcity of photos. Due to the low number of samples, the test size was very limited and could not be correctly assessed, and class imbalance tilted
+the model towards non-poisonous mushrooms.
+To account for these issues, I would make a free app with experts behind that could classify these mushrooms in real time and build a dataset from that, which would solve scarcity. Class imbalance can only be 
+solved by stratified splits, which is what was done in order to maintain ratios the same.
 
 ## Generative AI use disclosure
 
